@@ -1,0 +1,67 @@
+name: validate
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: oven-sh/setup-bun@v2
+
+      - name: gunzip and validate every dump against schema
+        run: |
+          set -euo pipefail
+          if [ ! -f schema/data.schema.json ]; then
+            echo "no schema/data.schema.json yet — skipping schema validation"
+            exit 0
+          fi
+          shopt -s nullglob
+          for gz in data/*/data.json.gz; do
+            ver=$(basename "$(dirname "$gz")")
+            echo "::group::validate $ver"
+            tmp=$(mktemp)
+            gunzip -c "$gz" > "$tmp"
+            bunx ajv-cli@latest validate --spec=draft2020 -s schema/data.schema.json -d "$tmp"
+            rm "$tmp"
+            echo "::endgroup::"
+          done
+
+      - name: verify sha256 + size in index.json matches the gz on disk
+        run: |
+          python3 - <<'PY'
+          import json, hashlib, os, sys
+          idx = json.load(open("index.json"))
+          fail = False
+          known = {v["version"]: v for v in idx["versions"]}
+          on_disk = sorted(os.listdir("data")) if os.path.isdir("data") else []
+          for ver in on_disk:
+              gz = f"data/{ver}/data.json.gz"
+              if not os.path.isfile(gz):
+                  continue
+              if ver not in known:
+                  print(f"::error::data/{ver}/ exists but {ver} is not in index.json")
+                  fail = True
+                  continue
+              actual_size = os.path.getsize(gz)
+              actual_sha = hashlib.sha256(open(gz, "rb").read()).hexdigest()
+              entry = known[ver]
+              if entry.get("size") != actual_size:
+                  print(f"::error::{ver} size mismatch: index={entry.get('size')} disk={actual_size}")
+                  fail = True
+              if entry.get("sha256") != actual_sha:
+                  print(f"::error::{ver} sha256 mismatch: index={entry.get('sha256')} disk={actual_sha}")
+                  fail = True
+          for ver in known:
+              if not os.path.isfile(f"data/{ver}/data.json.gz"):
+                  print(f"::error::{ver} listed in index.json but data/{ver}/data.json.gz is missing")
+                  fail = True
+          if idx.get("latest") and idx["latest"] not in known:
+              print(f"::error::index.json latest={idx['latest']} not in versions[]")
+              fail = True
+          sys.exit(1 if fail else 0)
+          PY

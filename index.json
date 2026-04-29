@@ -1,0 +1,22 @@
+{
+  "latest": "v1.8",
+  "schema": "/schema/data.schema.json",
+  "versions": [
+    {
+      "version": "v1.8",
+      "buildId": "22983270",
+      "dumpedAt": "2026-04-29T16:56:28Z",
+      "dumperCommit": "71a459c",
+      "size": 470662,
+      "sha256": "b716de9609cd7991ef61ea263926875a7e7f00c1b787a59d807bcaeb65cf00bc"
+    },
+    {
+      "version": "v1.7.3",
+      "buildId": "22983270",
+      "dumpedAt": "2026-04-29T16:45:43Z",
+      "dumperCommit": "71a459c",
+      "size": 442635,
+      "sha256": "04951a69cf76590aa89d5ec2923396b19381b577a89951cd1d326ea87be8a4d1"
+    }
+  ]
+}

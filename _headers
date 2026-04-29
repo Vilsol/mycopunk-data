@@ -1,0 +1,24 @@
+# Pre-gzipped dumps: served raw bytes; browsers transparently decompress.
+/data/*/data.json.gz
+  Content-Type: application/json
+  Content-Encoding: gzip
+  Cache-Control: public, max-age=31536000, immutable
+  Access-Control-Allow-Origin: *
+
+# Per-version changelogs.
+/data/*/CHANGES.md
+  Content-Type: text/markdown; charset=utf-8
+  Cache-Control: public, max-age=31536000, immutable
+  Access-Control-Allow-Origin: *
+
+# Schema — short cache so a fix propagates quickly.
+/schema/*.json
+  Content-Type: application/json
+  Cache-Control: public, max-age=300
+  Access-Control-Allow-Origin: *
+
+# Bootstrap manifest — short cache so consumers see new versions promptly.
+/index.json
+  Content-Type: application/json
+  Cache-Control: public, max-age=60
+  Access-Control-Allow-Origin: *
