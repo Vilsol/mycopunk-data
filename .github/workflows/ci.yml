@@ -11,9 +11,17 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: oven-sh/setup-bun@v2
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: install ajv-cli
+        run: npm install --no-save ajv-cli@^5 ajv-formats@^3
 
       - name: gunzip and validate every dump against schema
+        # ajv-cli infers parser from extension and fails obscurely
+        # ("Unexpected token ':'") on extensionless files — `--suffix=.json`
+        # on the temp file is load-bearing.
         run: |
           set -euo pipefail
           if [ ! -f schema/data.schema.json ]; then
@@ -24,9 +32,9 @@ jobs:
           for gz in data/*/data.json.gz; do
             ver=$(basename "$(dirname "$gz")")
             echo "::group::validate $ver"
-            tmp=$(mktemp)
+            tmp=$(mktemp --suffix=.json)
             gunzip -c "$gz" > "$tmp"
-            bunx ajv-cli@latest validate --spec=draft2020 -s schema/data.schema.json -d "$tmp"
+            ./node_modules/.bin/ajv validate --spec=draft2020 -s schema/data.schema.json -d "$tmp"
             rm "$tmp"
             echo "::endgroup::"
           done
