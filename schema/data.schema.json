@@ -4,7 +4,7 @@
   "title": "MycopunkDumper data.json",
   "description": "JSON Schema for the dump produced by the MycopunkDumper BepInEx plugin for the Unity game Mycopunk. The dump is a static catalog of every upgrade, gear, character, resource, and directive defined in the game, extracted by walking publicized game state at runtime and serializing it via Newtonsoft.Json (with a JsonUtility shim for Unity-native types). See SCHEMA_CHANGES.md for the migration history from the legacy upgrades.json shape.",
   "type": "object",
-  "required": ["gameVersion", "upgrades", "gears", "characters", "resources", "directives", "missions", "objectives", "regions", "enemies", "statusEffects", "stacks", "threats", "missionModifiers", "lootPools", "localization", "authItems", "patternPaths", "threatProfiles", "customWaves", "collectables", "enemyGroups", "globalEvents", "playerUpgrades", "statusEffectGlobals", "formulas", "achievements", "steamStats", "rarities", "missionContainers", "encounters", "quips", "crafting", "dialogue"],
+  "required": ["gameVersion", "upgrades", "gears", "characters", "resources", "directives", "missions", "objectives", "regions", "enemies", "statusEffects", "stacks", "threats", "missionModifiers", "lootPools", "localization", "authItems", "patternPaths", "threatProfiles", "customWaves", "collectables", "enemyGroups", "globalEvents", "playerUpgrades", "statusEffectGlobals", "formulas", "achievements", "steamStats"],
   "properties": {
     "gameVersion": {
       "type": "object",
