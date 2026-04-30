@@ -4,7 +4,7 @@
   "title": "MycopunkDumper data.json",
   "description": "JSON Schema for the dump produced by the MycopunkDumper BepInEx plugin for the Unity game Mycopunk. The dump is a static catalog of every upgrade, gear, character, resource, and directive defined in the game, extracted by walking publicized game state at runtime and serializing it via Newtonsoft.Json (with a JsonUtility shim for Unity-native types). See SCHEMA_CHANGES.md for the migration history from the legacy upgrades.json shape.",
   "type": "object",
-  "required": ["gameVersion", "upgrades", "gears", "characters", "resources", "directives", "missions", "objectives", "regions", "enemies", "statusEffects", "stacks", "threats", "missionModifiers", "lootPools", "localization", "authItems", "patternPaths", "threatProfiles", "customWaves", "collectables", "enemyGroups", "globalEvents", "playerUpgrades", "statusEffectGlobals", "formulas", "achievements", "steamStats"],
+  "required": ["gameVersion", "upgrades", "gears", "characters", "resources", "directives", "missions", "objectives", "regions", "enemies", "statusEffects", "stacks", "threats", "missionModifiers", "lootPools", "localization", "authItems", "patternPaths", "threatProfiles", "customWaves", "collectables", "enemyGroups", "globalEvents", "playerUpgrades", "statusEffectGlobals", "formulas", "achievements", "steamStats", "rarities", "missionContainers", "encounters", "quips", "crafting", "dialogue"],
   "properties": {
     "gameVersion": {
       "type": "object",
@@ -152,6 +152,34 @@
       "type": "array",
       "description": "Steam stat IDs the game tracks (player progression metrics). Scraped from `Online.SetStat`/`SubmitGlobalStat` call sites.",
       "items": { "type": "string" }
+    },
+    "rarities": {
+      "type": "object",
+      "description": "Master rarity/cost table. Per-rarity scrip cost, rare-resource cost, Ouroboros cleanse cost, saxonite craft-new cost, plus colors and the cross-referenced scrap PlayerResource. 6 entries: `standard`, `rare`, `epic`, `exotic`, `contraband`, `oddity`. Sourced from `Global.Instance.Rarities`. Keyed by `Name`.",
+      "additionalProperties": { "$ref": "#/$defs/RarityEntry" }
+    },
+    "missionContainers": {
+      "type": "object",
+      "description": "Mission-container variants — modes that wrap regular mission selection. 2 entries: `DefaultMissionContainer` and `Overtime Assignment` (the weekly mode with its scheduled modifier calendar inside `RawData.weekData`). Keyed by SO asset name.",
+      "additionalProperties": { "$ref": "#/$defs/MissionContainerEntry" }
+    },
+    "encounters": {
+      "type": "object",
+      "description": "IEncounter catalog — the procedural-mission spawn rules. 20 entries (Crater, Pipeline, Water, Meatspawn, Upgrade Drone, Lost Saxitos, Arc Gates, Scorched Transponder, Eye Wall, …). Mixed `UnityEngine.Object[]` (some entries are SO impls, others are GameObject prefabs whose component implements IEncounter). Per-encounter parameters live in `RawData`. Keyed by asset name; cross-referenced via `@ref:\"encounter:<Name>\"`.",
+      "additionalProperties": { "$ref": "#/$defs/EncounterEntry" }
+    },
+    "quips": {
+      "type": "object",
+      "description": "Master player emote/quip catalog. 63 entries across 4 characters; the same `Label` can repeat across characters so the keys here are the numeric `ID` stringified. Each entry has the spoken voiceline ID (resolves in `localization`), animation clip names, and the character it belongs to.",
+      "additionalProperties": { "$ref": "#/$defs/QuipEntry" }
+    },
+    "crafting": {
+      "$ref": "#/$defs/Crafting",
+      "description": "Master crafting price table. Singleton: there is exactly one `CraftingWindow` prefab in the game."
+    },
+    "dialogue": {
+      "$ref": "#/$defs/DialogueData",
+      "description": "Mission-control / crew dialogue system: the exchange catalog (id → trigger + lines + character refs) plus the per-trigger probability table."
     }
   },
 
@@ -1244,6 +1272,139 @@
           "type": "array",
           "description": "Modifier IDs this modifier is incompatible with.",
           "items": { "type": "integer" }
+        }
+      }
+    },
+
+    "RarityEntry": {
+      "type": "object",
+      "description": "Per-rarity pricing/visual. Sourced from the RarityData struct array on Global.Instance.Rarities (not a ScriptableObject — fields are reflectively read).",
+      "required": ["Name"],
+      "properties": {
+        "Name": { "type": "string", "description": "Canonical rarity key (\"standard\", \"rare\", \"epic\", \"exotic\", \"contraband\", \"oddity\")." },
+        "LocalizedName": { "type": "string", "description": "Localization key for the display name." },
+        "ColorTag": { "type": "string", "description": "Rich-text color tag prefix used when this rarity's name is rendered inline." },
+        "BoostedName": { "type": "string", "description": "Localization key for the \"Boosted\" variant label." },
+        "TurbochargedName": { "type": "string", "description": "Localization key for the \"Turbocharged\" variant label." },
+        "UpgradeScripCost": { "type": "integer", "description": "Base scrip cost to unlock an upgrade at this rarity." },
+        "UpgradeRareResourceCost": { "type": "integer", "description": "Base rare-resource cost." },
+        "CleanseCost": { "type": "integer", "description": "Ouroboros cleanse cost (paid in `ourosample`)." },
+        "CraftNewSaxoniteCost": { "type": "integer", "description": "Saxonite price for \"craft new\" rolls at this rarity." },
+        "AdditionalUpgradeCost": {
+          "type": "array",
+          "description": "Extra resources required beyond scrip+rare. Empty for most rarities.",
+          "items": { "$ref": "#/$defs/DUnlockCost" }
+        },
+        "ScrapResource": { "type": "string", "description": "PlayerResource ID (resolves in `resources`) — the scrap currency dismantling produces for this rarity." },
+        "Color": { "type": "string", "description": "RGBA(r,g,b,a)." },
+        "BackgroundColor": { "type": "string" },
+        "LightColor": { "type": "string" },
+        "Icon": { "$ref": "#/$defs/DIcon" }
+      }
+    },
+
+    "MissionContainerEntry": {
+      "type": "object",
+      "description": "Mission-container variant. The base class supplies AdditionalMissionFlags / RemovedMissionFlags; subclass-specific fields (e.g. WeeklyOvertimeAssignment.weekData[]) live in RawData.",
+      "required": ["Name", "Subclass"],
+      "properties": {
+        "Name": { "type": "string", "description": "Asset name (also the parent map key)." },
+        "Subclass": { "type": "string", "description": "C# class name." },
+        "Index": { "type": "integer", "description": "Position in Global.Instance.MissionContainers." },
+        "AdditionalMissionFlags": { "type": "string", "description": "MissionFlags ORed onto every mission this container wraps." },
+        "RemovedMissionFlags": { "type": "string", "description": "MissionFlags ANDed off." },
+        "RawData": { "type": "object", "description": "Full SO via JsonUtility. WeeklyOvertimeAssignment includes `weekData[]` (start times, seeds, modifier instance IDs that resolve via @ref) plus `rewards` / `repeatableRewards` / `resetInterval` / `minThreat` / `minIntensity`." }
+      }
+    },
+
+    "EncounterEntry": {
+      "type": "object",
+      "description": "An entry from Global.Instance.encounters — a procedural-mission spawn rule (terrain feature, prop set, mini-objective). 20 entries.",
+      "required": ["Name", "Subclass"],
+      "properties": {
+        "Name": { "type": "string", "description": "Asset name; also the @ref key (`encounter:<Name>`)." },
+        "Subclass": { "type": "string", "description": "Concrete C# class name (CraterEncounter, PipelineEncounter, …)." },
+        "Index": { "type": "integer", "description": "Position in Global.Instance.encounters[]." },
+        "IsPrefab": { "type": "boolean", "description": "True for GameObject prefabs (component implements IEncounter); false for SO impls." },
+        "RawData": { "type": ["object", "null"], "description": "Full encounter via JsonUtility. Per-subclass [SerializeField] fields — region masks, spawn weights, prefab refs, sub-objective targets. `null` for GameObject-prefab entries (5 of 20: Clear Objects Objective, LaptopRetrievalObjective, LostSaxitosEncounter, RelayTowers, UploadData SideObjective) since JsonUtility can't serialize a GameObject root — the encounter's `Name` doubles as the matching key in the `objectives` map for these." }
+      }
+    },
+
+    "QuipEntry": {
+      "type": "object",
+      "description": "Master quip/emote catalog entry. 63 entries spread across 4 characters.",
+      "required": ["ID", "Label"],
+      "properties": {
+        "ID": { "type": "integer", "description": "Numeric quip ID (stable; the parent map key is this stringified)." },
+        "Index": { "type": "integer", "description": "Position in Global.Instance.Quips." },
+        "Label": { "type": "string", "description": "_label — also doubles as the localization key." },
+        "Character": { "type": "string", "description": "CharacterType enum (Wrangler / Bruiser / Scrapper / Glider / All)." },
+        "QuipType": { "type": "string", "description": "QuipType flag-enum (None, Dance, DisableInVehicle)." },
+        "VoicelineTextID": { "type": "string", "description": "Localization key for the voiceline played when the quip fires (resolves in `localization`)." },
+        "TriggerOnFire": { "type": "boolean" },
+        "CancelOnFire": { "type": "boolean" },
+        "PlayThirdPersonAnimationForOwner": { "type": "boolean" },
+        "HideThirdPersonWeapon": { "type": "boolean" },
+        "IsThirdPersonAdditive": { "type": "boolean" },
+        "MinAnimationInterval": { "type": "number" },
+        "AnimationFirstPersonClip": { "type": "string", "description": "Asset name of the first-person animation clip." },
+        "AnimationThirdPersonClip": { "type": "string", "description": "Asset name of the third-person animation clip." },
+        "Icon": { "$ref": "#/$defs/DIcon" }
+      }
+    },
+
+    "Crafting": {
+      "type": "object",
+      "description": "Master crafting price table. Singleton — sourced from the `CraftingWindow` MonoBehaviour prefab's private cost arrays.",
+      "properties": {
+        "MinLevelToAccessCrafting": { "type": "integer", "description": "Player level required to access the crafting bench (10 in source)." },
+        "RandomCraftCost": { "type": "array", "description": "Roll a fully-random new upgrade.", "items": { "$ref": "#/$defs/DUnlockCost" } },
+        "WeaponCraftCost": { "type": "array", "description": "Roll a random upgrade for a specific gear.", "items": { "$ref": "#/$defs/DUnlockCost" } },
+        "UpgradeCraftCost": { "type": "array", "description": "Duplicate an existing upgrade.", "items": { "$ref": "#/$defs/DUnlockCost" } },
+        "UpcraftToRareCost": { "type": "array", "description": "Tier-up: Standard → Rare.", "items": { "$ref": "#/$defs/DUnlockCost" } },
+        "UpcraftToEpicCost": { "type": "array", "description": "Rare → Epic.", "items": { "$ref": "#/$defs/DUnlockCost" } },
+        "UpcraftToExoticCost": { "type": "array", "description": "Epic → Exotic.", "items": { "$ref": "#/$defs/DUnlockCost" } }
+      }
+    },
+
+    "DialogueData": {
+      "type": "object",
+      "properties": {
+        "Exchanges": {
+          "type": "object",
+          "description": "DialogueExchange catalog keyed by `id`.",
+          "additionalProperties": { "$ref": "#/$defs/DialogueEntry" }
+        },
+        "TriggerChances": {
+          "type": "array",
+          "description": "Per-trigger probability indexed by `Mathf.Log2((int)Trigger)`. 12 entries: [None, Ambient, PlayerJoin, PlayerLeave, DropPodLaunch, DropPodFalling, DropPodLand, DropPodDoorOpen, DropPodReturnToHub, OpenInventory, Killed/KilledByPlayer, Revive].",
+          "items": { "type": "number" }
+        }
+      }
+    },
+
+    "DialogueEntry": {
+      "type": "object",
+      "description": "A scripted multi-line exchange between Mission Control and the crew.",
+      "required": ["ID"],
+      "properties": {
+        "ID": { "type": "string", "description": "Localization key root — lines resolve via TextBlocks per-character variants." },
+        "Trigger": { "type": "string", "description": "Trigger enum stringified (Ambient / PlayerJoin / DropPodLaunch / Killed / Revive / …)." },
+        "MissionTypes": { "type": "string", "description": "MissionType flag-enum gating which mission types this exchange can play in." },
+        "LevelTypes": { "type": "string", "description": "LevelFlags: Hub / NormalLevels / SpecialLevels." },
+        "ValidRegions": { "type": "string", "description": "LevelFlags region mask." },
+        "MainCharacter": { "type": "string", "description": "Dude asset name driving the exchange." },
+        "SecondaryCharacter": { "type": "string" },
+        "Lines": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "Character": { "type": "string", "description": "Dude asset name speaking this line." },
+              "Delay": { "type": "number", "description": "Seconds to wait before playing." },
+              "StartWithNext": { "type": "boolean", "description": "If true, plays simultaneously with the previous line." }
+            }
+          }
         }
       }
     }
