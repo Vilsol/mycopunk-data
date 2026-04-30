@@ -647,6 +647,8 @@
       "required": ["ID", "CanBeChosen"],
       "properties": {
         "ID": { "type": "integer", "description": "Stable directive ID (also used as parent map's key, stringified)." },
+        "Name": { "type": "string", "description": "Resolved display name (block 0 of the first property's NameID, e.g. \"Cleanse\", \"Elemental Testing\")." },
+        "Description": { "type": "string", "description": "Resolved description (block 1 of the first property's NameID)." },
         "CanBeChosen": { "type": "boolean", "description": "Whether the directive appears in the random selection pool." },
         "Icon": { "$ref": "#/$defs/DIcon" },
         "TierWeights": { "$ref": "#/$defs/TierWeights" },
@@ -687,6 +689,9 @@
           "type": "string",
           "description": "Human-readable form of `Type` (prefix stripped + CamelCase split). E.g. `DirectiveProperty_KillDeaths` → \"Kill Deaths\"."
         },
+        "NameID": { "type": "string", "description": "Localization key from the property's `NameID` (e.g. `dp_kill`, `dp_kill_e`, `dp_kill_g`). Resolves in `localization`." },
+        "Name": { "type": "string", "description": "Resolved display name (block 0 of NameID)." },
+        "Description": { "type": "string", "description": "Resolved description (block 1 of NameID)." },
         "LocalizationKeys": {
           "type": "array",
           "description": "Every `TextBlocks.GetString` key referenced in this directive property's source code. See `UpgradeDProperty.LocalizationKeys` for details.",
@@ -852,7 +857,7 @@
         "Name": { "type": "string", "description": "Public Name property (display)." },
         "APIName": { "type": "string", "description": "Stable API name." },
         "InternalName": { "type": "string", "description": "Internal `_name` field — short identifier used in code (e.g. \"b_lasercopter\", \"Slicer\")." },
-        "Tags": { "type": "string", "description": "EnemyTags flag-enum stringified (e.g. \"Gunner\", \"Boss, Flying\")." },
+        "Tags": { "type": "string", "description": "EnemyTags flag-enum stringified, comma-separated. Known values: Gunner, Flyer, Exploder, Sniper, Shielder, Support, Turret, Tall, Crawler, Difficult, Immunity, Oxythane." },
         "LevelFlags": { "type": "string", "description": "LevelFlags flag-enum stringified — which world regions this enemy can spawn in." },
         "OverrideUpgradeDropChance": { "type": "number", "description": "Replaces the default upgrade drop chance for this enemy (-1 = use default)." },
         "OverclockChance": { "type": "number", "description": "Probability the enemy spawns overclocked (0..1)." },
@@ -1075,7 +1080,9 @@
         "Name": { "type": "string" },
         "Color": { "type": "string" },
         "Count": { "type": "integer" },
-        "PunchTextID": { "type": "string" },
+        "PunchTextID": { "type": "string", "description": "Localization key for the on-punch flavor line." },
+        "PunchText": { "type": "string", "description": "Resolved flavor text from `PunchTextID` block 0." },
+        "Icon": { "$ref": "#/$defs/DIcon" },
         "Rewards": { "type": "array", "items": { "$ref": "#/$defs/LevelUnlockEntry" } }
       }
     },
@@ -1341,6 +1348,7 @@
         "Character": { "type": "string", "description": "CharacterType enum (Wrangler / Bruiser / Scrapper / Glider / All)." },
         "QuipType": { "type": "string", "description": "QuipType flag-enum (None, Dance, DisableInVehicle)." },
         "VoicelineTextID": { "type": "string", "description": "Localization key for the voiceline played when the quip fires (resolves in `localization`)." },
+        "VoicelineText": { "type": "string", "description": "Resolved text from `VoicelineTextID` block 0 — the actual line spoken." },
         "TriggerOnFire": { "type": "boolean" },
         "CancelOnFire": { "type": "boolean" },
         "PlayThirdPersonAnimationForOwner": { "type": "boolean" },
@@ -1402,7 +1410,8 @@
             "properties": {
               "Character": { "type": "string", "description": "Dude asset name speaking this line." },
               "Delay": { "type": "number", "description": "Seconds to wait before playing." },
-              "StartWithNext": { "type": "boolean", "description": "If true, plays simultaneously with the previous line." }
+              "StartWithNext": { "type": "boolean", "description": "If true, plays simultaneously with the previous line." },
+              "Text": { "type": "string", "description": "Resolved line text (block at line index N under the exchange's TextBlocks key)." }
             }
           }
         }
