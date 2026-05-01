@@ -744,7 +744,8 @@
           "type": "object",
           "description": "Mission-start voiceline reference.",
           "properties": {
-            "ID": { "type": "string", "description": "Voiceline ID (key into Wwise/voiceline catalog)." },
+            "ID": { "type": "string", "description": "TextBlocks key (also routes the Wwise event)." },
+            "Text": { "type": "string", "description": "Resolved intro line from TextBlocks block 0." },
             "Priority": { "type": "integer" }
           }
         },
@@ -786,7 +787,8 @@
           "type": "object",
           "description": "Voiceline played when the objective activates.",
           "properties": {
-            "ID": { "type": "string" },
+            "ID": { "type": "string", "description": "TextBlocks key (also routes the Wwise event)." },
+            "Text": { "type": "string", "description": "Resolved line from TextBlocks block 0." },
             "Priority": { "type": "integer" }
           }
         },
@@ -794,18 +796,21 @@
           "type": "object",
           "description": "Voiceline played when the objective completes successfully.",
           "properties": {
-            "ID": { "type": "string" },
+            "ID": { "type": "string", "description": "TextBlocks key." },
+            "Text": { "type": "string", "description": "Resolved line." },
             "Priority": { "type": "integer" }
           }
         },
         "ObjectiveInfoList": {
           "type": "array",
-          "description": "Per-step HUD strings shown sequentially as the objective progresses through its phases. Each step has a title, a description, and a flag controlling whether numerical progress is rendered.",
+          "description": "Per-step HUD strings shown sequentially as the objective progresses through its phases. Each step has a localization key + resolved title/description, and a flag controlling whether numerical progress is rendered.",
           "items": {
             "type": "object",
             "properties": {
-              "Title": { "type": "string" },
-              "Description": { "type": "string" },
+              "TitleID": { "type": "string", "description": "TextBlocks key for the step title (e.g. \"o_breach\")." },
+              "Title": { "type": "string", "description": "Resolved title (e.g. \"Breach The Door\")." },
+              "DescriptionID": { "type": "string", "description": "TextBlocks key for the step description." },
+              "Description": { "type": "string", "description": "Resolved description." },
               "ShowNumberProgress": { "type": "boolean" }
             }
           }
