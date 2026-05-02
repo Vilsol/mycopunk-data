@@ -180,6 +180,11 @@
     "dialogue": {
       "$ref": "#/$defs/DialogueData",
       "description": "Mission-control / crew dialogue system: the exchange catalog (id → trigger + lines + character refs) plus the per-trigger probability table."
+    },
+    "upgradePresets": {
+      "type": "object",
+      "description": "Named bundles of `UpgradeProperty` overrides referenced by `SkinUpgradeProperty_Preset.preset` (e.g. \"Coppertone\", \"Bloodmetal\", \"Glittering\"). Each preset's `Modifiers` mirrors `Skin.Modifiers` so a consumer can answer \"what does Glittering do?\" without parsing `RawData`. Catalog source: `Resources.FindObjectsOfTypeAll<UpgradePreset>()`. Keyed by SO asset name.",
+      "additionalProperties": { "$ref": "#/$defs/UpgradePresetEntry" }
     }
   },
 
@@ -233,6 +238,10 @@
         },
         "Pattern": { "$ref": "#/$defs/HexMap" },
         "Icon": { "$ref": "#/$defs/DIcon" },
+        "Skin": {
+          "$ref": "#/$defs/DSkin",
+          "description": "Cosmetic-specific data, populated only when `UpgradeType` == `\"Cosmetic\"` (i.e. the upgrade is a `SkinUpgrade`). Aggregates fields scattered across `SkinUpgrade` and its `SkinUpgradeProperty` subclasses."
+        },
         "Properties": {
           "type": "array",
           "description": "Per-property data for this upgrade. Each entry pairs a property class name (Type) with the raw Unity-serialized config (Raw) and a per-upgradable expansion of evaluated stats (StatsByUpgradable).",
@@ -402,6 +411,201 @@
           "items": { "type": "number" }
         },
         "Texture": { "type": "string", "description": "Name of the texture-atlas asset." }
+      }
+    },
+
+    "DSkin": {
+      "type": "object",
+      "description": "Cosmetic-only fields on a `SkinUpgrade`. Composed of three layers: SkinUpgrade-level scalars (BaseSkin/CountWithInCodex/ChanceToRemoveFromPool/ColorIcon/ChangeHueIfNoModifiersApplied/OverridesPattern), runtime-derived flags (HasVfx/HasCrab/HasCharacterModel/NameModifiers), and per-property summaries (Modifiers[]). `Previews` is a deterministic relative-path map shaped to match the skin renderer's output; the file existing on disk depends on whether the renderer has run.",
+      "properties": {
+        "BaseSkin": { "type": "string", "description": "Upgrade key — parent skin this inherits visuals from (or absent for root skins). Lookup target in the parent `upgrades` map." },
+        "CountWithInCodex": { "type": "string", "description": "Upgrade key — codex-collection alias (e.g. \"Factory\" and \"Factory (Bloodmetal)\" share a single codex slot). Lookup target in `upgrades`." },
+        "ChanceToRemoveFromPool": { "type": "number", "description": "0..1 — probability this skin is removed from the world drop pool after rolling once." },
+        "ColorIcon": { "type": "boolean", "description": "Whether the icon is tinted by the skin color at render time." },
+        "ChangeHueIfNoModifiersApplied": { "type": "boolean" },
+        "OverridesPattern": { "type": "boolean", "description": "True when `SkinUpgrade.overridePattern` is set — the skin tree uses a non-default `HexMapProfile`. Default is `Global.Instance.SkinPattern`." },
+        "HasVfx": { "type": "boolean", "description": "Any VFX-spawning property is present (GunCrab-derived, VFXMod, VFXCustomProp). Skins with this flag run a `VisualEffect` that needs manual ticking when `Time.timeScale = 0`." },
+        "HasCrab": { "type": "boolean", "description": "Any GunCrab-derived property — the gun gets a crab/eye/pump/roach companion prop spawned next to it." },
+        "HasCharacterModel": { "type": "boolean", "description": "Any `SkinUpgradeProperty_CharacterModel` — replaces the player's first/third-person mesh." },
+        "IconAtlas": { "$ref": "#/$defs/DIconAtlas" },
+        "NameModifiers": {
+          "type": "array",
+          "description": "Distinct instance-name modifier suffixes observed via deterministic seed sweep over `SkinUpgrade.GetInstanceName(seed)` for seeds 0..63. Entries are the parenthesised inner part — e.g. \"Bloodmetal\", \"Spectral, Sapphire\". Useful for UI dropdowns and codex grouping.",
+          "items": { "type": "string" }
+        },
+        "Modifiers": {
+          "type": "array",
+          "description": "Per-property summary. Walked over `SkinUpgrade.GetProperties()` (which inlines properties inherited from `BaseSkin`). Each entry resolves the most useful subclass-specific fields; consumers that need everything can fall back to the corresponding `Properties[i].Raw` on the parent upgrade.",
+          "items": { "$ref": "#/$defs/DSkinModifier" }
+        },
+        "Previews": {
+          "type": "object",
+          "description": "Per-(gear, preset) relative paths to rendered mp4 turntables. Outer key: gear APIName (matches `gears`/`characters`). Inner key: preset slug — `\"base\"` for the no-preset rotation, otherwise the sanitized preset SO name (matches the slug used by the SkinRenderer task). Value: path relative to the base extracted-dump directory (e.g. `~/MycopunkExtracted/<version>/`). The file at the path may or may not exist depending on whether the renderer has run; the path is computed from the slug pattern, not from disk.",
+          "additionalProperties": {
+            "type": "object",
+            "additionalProperties": { "type": "string" }
+          },
+          "examples": [{ "wrangler": { "base": "skin-previews/wrangler_Factory__base/wrangler_Factory__base.mp4", "Bloodmetal": "skin-previews/wrangler_Factory__Bloodmetal/wrangler_Factory__Bloodmetal.mp4" } }]
+        }
+      }
+    },
+
+    "DIconAtlas": {
+      "type": "object",
+      "description": "Raw atlas-cropping data so consumers can pull the source pixels from the original sprite sheet without re-running `Sprite.Create`. Position/Size are pre-scaling; the actual displayed rect is `position * (atlasWidth / TextureSize)`, `size * (atlasWidth / TextureSize)` (see `SkinUpgrade.Icon` getter).",
+      "properties": {
+        "Texture": { "type": "string", "description": "Source `Texture2D` asset name." },
+        "TextureSize": { "type": "integer", "description": "`SkinUpgrade.textureSize` (defaults to 4096) — divisor for the position/size scale factor against the actual atlas resolution." },
+        "Position": {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 2,
+          "description": "[x, y] in atlas pixel-coordinates (pre-scaling).",
+          "items": { "type": "number" }
+        },
+        "Size": {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 2,
+          "description": "[w, h] in atlas pixel-coordinates (pre-scaling).",
+          "items": { "type": "number" }
+        }
+      }
+    },
+
+    "DSkinModifier": {
+      "type": "object",
+      "description": "Resolved summary of one `SkinUpgradeProperty` (or any `UpgradeProperty`) entry. Field families are mutually exclusive — only fields tagged for the property's `Type` are populated, the rest are absent. Fall back to the parent's `Properties[i].Raw` when this summary doesn't cover the field you need.",
+      "required": ["Type"],
+      "properties": {
+        "Type": { "type": "string", "description": "Concrete C# class name (e.g. \"SkinUpgradeProperty_Trim\")." },
+        "Chance": { "type": ["number", "null"], "description": "Roll chance (0..1). Null when the subclass doesn't expose one OR when chance is meaningless because the property always applies (`SkinUpgradeProperty_Texture`/`_Color` whose `GetPropertyChance` is constant 1)." },
+        "CurveConstant": { "type": ["boolean", "null"], "description": "True when the property's `AnimationCurve` evaluates to the same value at 0 and 1 — i.e. the curve is acting as a chance gate rather than a roll distribution. Null when no curve is present." },
+        "CurveStart": { "type": "number", "description": "`curve.Evaluate(0)` — start of the rolled-value distribution." },
+        "CurveEnd": { "type": "number", "description": "`curve.Evaluate(1)` — end of the rolled-value distribution." },
+
+        "TrimID": { "type": "string", "description": "SkinUpgradeProperty_Trim — TextBlocks key for the trim's display name." },
+        "TrimName": { "type": "string", "description": "Resolved trim name (e.g. \"Sapphire\", \"Topaz\")." },
+        "TrimColor": { "type": "string", "description": "RGBA(...) — base trim color." },
+        "TrimSpecular": { "type": "string", "description": "RGBA(...) — specular tint applied alongside trimColor." },
+        "TrimHueChance": { "type": "number", "description": "0..1 — chance the trim's hue is shifted instead of using the literal trimColor." },
+        "TrimMaxHue": { "type": "number", "description": "-1..1 — max hue-shift magnitude when the hue roll fires." },
+        "TrimFlip": { "type": "boolean" },
+        "TrimAlpha": { "type": "boolean" },
+
+        "Preset": { "type": "string", "description": "SkinUpgradeProperty_Preset — `UpgradePreset` SO asset name. Lookup target in the top-level `upgradePresets` map." },
+
+        "TextureFind": { "type": "string", "description": "SkinUpgradeProperty_Texture — name of the source Material the texture-replacement targets (\"find this material, swap it\")." },
+        "TextureMain": { "type": "string", "description": "Replacement albedo `Texture2D` asset name." },
+        "TextureSpecular": { "type": "string", "description": "Replacement specular `Texture2D` asset name." },
+        "TextureOverrideColor": { "type": "boolean" },
+        "TextureColor": { "type": "string", "description": "RGBA(...) — only meaningful when `TextureOverrideColor` is true." },
+        "TextureShadowColor": { "type": "string", "description": "RGBA(...) — only meaningful when `TextureOverrideColor` is true." },
+        "TextureOverrideSpecularColor": { "type": "boolean" },
+        "TextureSpecularColor": { "type": "string", "description": "RGBA(...) — only meaningful when `TextureOverrideSpecularColor` is true." },
+        "TextureOverrideSmoothness": { "type": "boolean" },
+        "TextureSmoothness": { "type": "number", "description": "Only meaningful when `TextureOverrideSmoothness` is true." },
+
+        "ColorPrimary": { "type": "string", "description": "SkinUpgradeProperty_Color — RGBA(...) primary tint applied to `_Color` shader prop." },
+        "ColorShadow": { "type": "string", "description": "RGBA(...) shadow tint applied to `_ShadowColor`." },
+        "ColorMaterialMin": { "type": "integer", "description": "`Range<int> materialRange.min` — restricts which override-mat indices receive the tint." },
+        "ColorMaterialMax": { "type": "integer" },
+
+        "ChromaSunBrightness": { "type": "number", "description": "SkinUpgradeProperty_Chroma." },
+        "ChromaShadowBrightness": { "type": "number" },
+
+        "EmissiveStatID": { "type": "string", "description": "SkinUpgradeProperty_Emissive — TextBlocks key for the modifier's display name." },
+        "EmissiveStatName": { "type": "string", "description": "Resolved name." },
+        "EmissiveColor": { "type": "string", "description": "RGBA(HDR)." },
+        "EmissiveHueChance": { "type": "number" },
+        "EmissiveMaxHue": { "type": "number" },
+        "EmissiveFlipTrim": { "type": "boolean" },
+
+        "NeonRed": { "type": "number", "description": "SkinUpgradeProperty_Neon — channel intensity per primary." },
+        "NeonGreen": { "type": "number" },
+        "NeonBlue": { "type": "number" },
+        "NeonYellow": { "type": "number" },
+        "NeonMagenta": { "type": "number" },
+        "NeonFlipTrim": { "type": "boolean" },
+
+        "Contrast": { "type": "number", "description": "SkinUpgradeProperty_Contrast — contrast value applied uniformly." },
+
+        "ContrastRangeLabelID": { "type": "string", "description": "SkinUpgradeProperty_ContrastRange." },
+        "ContrastRangeLabel": { "type": "string", "description": "Resolved." },
+
+        "OverlayID": { "type": "string", "description": "SkinUpgradeProperty_Overlay only (Empty for `_OverlayMat`). TextBlocks key for the overlay's display name." },
+        "OverlayLabel": { "type": "string", "description": "Resolved overlay label." },
+        "OverlayTexture": { "type": "string", "description": "`overlayTex` asset name (both _Overlay and _OverlayMat)." },
+        "OverlayBoost": { "type": "number", "description": "_Overlay only." },
+        "OverlayTile": { "type": "number" },
+        "OverlayTriplanar": { "type": "boolean" },
+
+        "TrickColor": { "type": "string", "description": "SkinUpgradeProperty_TrickOrTreat — RGBA(...)." },
+        "TreatColor": { "type": "string", "description": "RGBA(...)." },
+        "TrickHueChance": { "type": "number" },
+        "TrickRandHueIntensity": { "type": "number" },
+        "TrickFlipTrim": { "type": "boolean" },
+
+        "InfectionScale": { "type": "number", "description": "SkinUpgradeProperty_Infection." },
+
+        "CrabModel": { "type": "string", "description": "SkinUpgradeProperty_GunCrab (and subclasses) — `crab` GameObject prefab asset name." },
+        "CrabUpgrade": { "type": "string", "description": "Upgrade key (`SkinUpgradeProperty_GunCrab.myUpgrade`). Lookup in `upgrades`." },
+        "CrabMeshes": {
+          "type": "array",
+          "description": "SkinUpgradeProperty_GunCrab_List — pool of mesh asset names the crab variant rolls between.",
+          "items": { "type": "string" }
+        },
+
+        "VfxCrabNameID": { "type": "string", "description": "SkinUpgradeProperty_VFXCrab — TextBlocks key for the VFX variant's display name." },
+        "VfxCrabName": { "type": "string", "description": "Resolved." },
+        "VfxCrabNameColor": { "type": "string", "description": "Rarity-enum stringified — name display tier." },
+        "VfxCrabSizeOverride": { "type": "number", "description": "-1 = no override; otherwise overrides the prefab VFX `Size` parameter." },
+        "VfxCrabIntensityOverride": { "type": "number" },
+        "VfxCrabRateOverride": { "type": "number" },
+        "VfxCrabLongevityOverride": { "type": "number" },
+        "VfxCrabOverrideSpeed": { "type": "boolean" },
+        "VfxCrabSpeedOverride": { "type": "number" },
+        "VfxCrabOverrideColor": { "type": "boolean" },
+        "VfxCrabColor1": { "type": "string", "description": "RGBA(HDR) — only meaningful when `VfxCrabOverrideColor` is true." },
+        "VfxCrabColor2": { "type": "string", "description": "RGBA(HDR) — only meaningful when `VfxCrabOverrideColor` is true." },
+        "VfxCrabAlphaOverride": { "type": "number" },
+
+        "VfxCustomPropName": { "type": "string", "description": "SkinUpgradeProperty_VFXCustomProp — name of the VFX shader/expression property being overridden." },
+        "VfxCustomPropType": { "type": "string", "description": "Float / Float2 / Float3 / Float4." },
+        "VfxCustomPropValue": {
+          "type": "array",
+          "minItems": 4,
+          "maxItems": 4,
+          "description": "Vector4 unpacked to [x, y, z, w]. Only the first N components are meaningful per `VfxCustomPropType`.",
+          "items": { "type": "number" }
+        },
+
+        "CharacterModelArmL": { "type": "string", "description": "SkinUpgradeProperty_CharacterModel — `firstPersonArmL` SkinnedMeshRenderer mesh asset name." },
+        "CharacterModelArmR": { "type": "string", "description": "`firstPersonArmR` mesh asset name." },
+        "CharacterModelThirdPerson": { "type": "string", "description": "`thirdPersonMesh` mesh asset name." }
+      }
+    },
+
+    "UpgradePresetEntry": {
+      "type": "object",
+      "description": "A named bundle of `UpgradeProperty` overrides referenced by `SkinUpgradeProperty_Preset.preset`. When a preset's parent `chance` roll succeeds, its inner `properties` list is applied on top of the parent skin (substituting one slot via `RandomContainerRange`).",
+      "required": ["Name"],
+      "properties": {
+        "Name": { "type": "string", "description": "SO asset name. Matches the parent map's key." },
+        "OverrideNameModifier": { "type": "string", "description": "Suffix applied to a parent skin's display name when this preset rolls (e.g. \"Coppertone\" → \"Factory (Coppertone)\"). TextBlocks-resolved at runtime." },
+        "NameModifierColor": { "type": "string", "description": "Hex color tag the modifier name is wrapped in (e.g. `f40857`)." },
+        "ShowNameInStats": { "type": "boolean" },
+        "RandomContainerRangeMin": { "type": "integer", "description": "Inclusive lower bound for the index-substitution roll inside the preset's property list. When `min == max`, no substitution happens; otherwise one entry in `[min, max]` replaces the entry at `min`." },
+        "RandomContainerRangeMax": { "type": "integer" },
+        "Modifiers": {
+          "type": "array",
+          "description": "Resolved per-property summary of the preset's own `UpgradePropertyList`. Same shape as `Skin.Modifiers` — answers \"what does this preset do?\" without parsing `RawData`.",
+          "items": { "$ref": "#/$defs/DSkinModifier" }
+        },
+        "RawData": {
+          "type": "object",
+          "description": "Full `UpgradePreset` ScriptableObject serialized via Unity `JsonUtility`. Captures the inner `properties: UpgradePropertyList` (each entry an `UpgradeProperty` subclass — colors, trim refs, texture overrides — same shape as per-skin properties)."
+        }
       }
     },
 

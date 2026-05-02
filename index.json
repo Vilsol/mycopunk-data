@@ -1,7 +1,15 @@
 {
-  "latest": "v1.8.1H1",
+  "latest": "v1.8.2",
   "schema": "/schema/data.schema.json",
   "versions": [
+    {
+      "version": "v1.8.2",
+      "buildId": "23053532",
+      "dumpedAt": "2026-05-02T17:56:24Z",
+      "dumperCommit": "71a459c",
+      "size": 543283,
+      "sha256": "66cee80862df6695b47734e7e4387ad10327d3a69ec61d09d30dce5ac32806c5"
+    },
     {
       "version": "v1.8.1H1",
       "buildId": "23019260",
