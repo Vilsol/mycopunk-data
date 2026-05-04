@@ -1,8 +1,7 @@
 # mycopunk-data
 
 Versioned, gzipped JSON dumps of the Unity game **Mycopunk** — every upgrade,
-gear, character, mission, objective, enemy, etc., extracted via the
-[MycopunkDumper](https://github.com/Vilsol/MycopunkDumper) BepInEx plugin.
+gear, character, mission, objective, enemy, etc.
 
 Hosted as a static site on Cloudflare Pages.
 
@@ -63,18 +62,3 @@ dump.
 
 Consumers should re-fetch `index.json` periodically and only fetch new dumps
 when `latest` changes.
-
-## Adding a version
-
-Run from the `MycopunkDumper` checkout (game must be installed and BepInEx
-configured — see that repo's CLAUDE.md):
-
-```bash
-mise run dump
-mise run release-dump /path/to/mycopunk-data
-```
-
-That task: dumps the game, gzips the output, generates `CHANGES.md` against
-the previous version, refreshes `index.json` and `_redirects`, copies the
-current schema, and prints a commit recipe. Push triggers Cloudflare Pages
-deploy automatically; the GitHub Actions CI validates every dump on each push.
