@@ -1,7 +1,16 @@
 {
-  "latest": "v2.0.1",
+  "latest": "v2.0.2",
   "schema": "/schema/data.schema.json",
   "versions": [
+    {
+      "version": "v2.0.2",
+      "buildId": "26120128",
+      "dumpedAt": "2026-10-22T21:03:57Z",
+      "dumperCommit": "d56bb7e",
+      "size": 666901,
+      "sha256": "70eda67bddb8313f68cbe45702e0e6ff9d3fc84cefb6845351ad6a69a6a9b4c0",
+      "steamManifestId": "5210132114692865506"
+    },
     {
       "version": "v2.0.1",
       "buildId": "26066695",
